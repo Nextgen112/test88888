@@ -24,10 +24,10 @@ const NavItem: React.FC<NavItemProps> = ({ href, label, icon, active }) => {
   
   return (
     <Link href={href}>
-      <a className={`${baseClasses} ${active ? activeClasses : inactiveClasses}`}>
+      <div className={`${baseClasses} ${active ? activeClasses : inactiveClasses}`}>
         {icon}
         <span>{label}</span>
-      </a>
+      </div>
     </Link>
   );
 };
