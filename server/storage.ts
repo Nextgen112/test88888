@@ -1,16 +1,16 @@
 import {
-  users, User, InsertUser,
-  files, File, InsertFile,
-  ipWhitelist, IpWhitelist, InsertIpWhitelist,
-  accessLogs, AccessLog, InsertAccessLog,
-  DashboardStats
+  User, InsertUser,
+  File, InsertFile,
+  IpWhitelist, InsertIpWhitelist,
+  AccessLog, InsertAccessLog,
+  DashboardStats,
+  users, files, ipWhitelist, accessLogs
 } from "@shared/schema";
-
 import path from "path";
 import fs from "fs";
-import crypto from "crypto";
+import { db } from "./db";
+import { eq, and, gt, desc, sql } from "drizzle-orm";
 
-// Define interface for all storage operations
 export interface IStorage {
   // User operations
   getUser(id: number): Promise<User | undefined>;
@@ -44,218 +44,189 @@ export interface IStorage {
   isIpWhitelisted(ipAddress: string): Promise<boolean>;
 }
 
-// Memory storage implementation
-export class MemStorage implements IStorage {
-  private users: Map<number, User>;
-  private files: Map<number, File>;
-  private ipWhitelists: Map<number, IpWhitelist>;
-  private accessLogs: Map<number, AccessLog>;
-  
-  private currentUserId: number;
-  private currentFileId: number;
-  private currentIpWhitelistId: number;
-  private currentAccessLogId: number;
-  
+export class DatabaseStorage implements IStorage {
   private uploadsDir: string;
-
+  
   constructor() {
-    this.users = new Map();
-    this.files = new Map();
-    this.ipWhitelists = new Map();
-    this.accessLogs = new Map();
-    
-    this.currentUserId = 1;
-    this.currentFileId = 1;
-    this.currentIpWhitelistId = 1;
-    this.currentAccessLogId = 1;
-    
-    // Create uploads directory
     this.uploadsDir = path.join(process.cwd(), 'uploads');
     if (!fs.existsSync(this.uploadsDir)) {
       fs.mkdirSync(this.uploadsDir, { recursive: true });
     }
     
-    // Initialize with some sample data
+    // Initialize with some sample data if needed
     this.initializeData();
   }
   
-  private initializeData() {
-    // Create admin user
-    this.createUser({
-      username: 'admin',
-      password: 'admin123' // In a real app, this would be hashed
-    });
+  private async initializeData() {
+    // Check if we have any users
+    const existingUsers = await db.select().from(users);
     
-    // Add some IP whitelist entries
-    this.createIpWhitelist({
-      ipAddress: '127.0.0.1',
-      description: 'Localhost',
-      isActive: true,
-      createdBy: 1
-    });
+    if (existingUsers.length === 0) {
+      // Create a sample admin user
+      await db.insert(users).values({
+        username: 'admin',
+        password: 'password'
+      });
+    }
     
-    this.createIpWhitelist({
-      ipAddress: '192.168.1.100',
-      description: 'Development Server',
-      isActive: true,
-      createdBy: 1
-    });
+    // Check if localhost is already whitelisted
+    const existingLocalhost = await db.select()
+      .from(ipWhitelist)
+      .where(eq(ipWhitelist.ipAddress, '127.0.0.1'));
+    
+    if (existingLocalhost.length === 0) {
+      // Add localhost to IP whitelist
+      await db.insert(ipWhitelist).values({
+        ipAddress: '127.0.0.1',
+        description: 'Localhost',
+        isActive: true,
+        createdBy: 1
+      });
+    }
   }
-
-  // User operations
+  
   async getUser(id: number): Promise<User | undefined> {
-    return this.users.get(id);
+    const result = await db.select().from(users).where(eq(users.id, id));
+    return result[0];
   }
-
+  
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username
-    );
+    const result = await db.select().from(users).where(eq(users.username, username));
+    return result[0];
   }
-
+  
   async createUser(insertUser: InsertUser): Promise<User> {
-    const id = this.currentUserId++;
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
+    const [user] = await db.insert(users).values(insertUser).returning();
     return user;
   }
   
-  // File operations
   async getFiles(): Promise<File[]> {
-    return Array.from(this.files.values()).sort((a, b) => {
-      return new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime();
-    });
+    return db.select().from(files).orderBy(desc(files.uploadedAt));
   }
   
   async getFile(id: number): Promise<File | undefined> {
-    return this.files.get(id);
+    const result = await db.select().from(files).where(eq(files.id, id));
+    return result[0];
   }
   
   async getFileByFilename(filename: string): Promise<File | undefined> {
-    return Array.from(this.files.values()).find(
-      (file) => file.filename === filename
-    );
+    const result = await db.select().from(files).where(eq(files.filename, filename));
+    return result[0];
   }
   
   async createFile(insertFile: InsertFile): Promise<File> {
-    const id = this.currentFileId++;
-    const file: File = { 
-      ...insertFile, 
-      id, 
-      uploadedAt: new Date() 
-    };
-    this.files.set(id, file);
+    const [file] = await db.insert(files).values(insertFile).returning();
     return file;
   }
   
   async deleteFile(id: number): Promise<boolean> {
     const file = await this.getFile(id);
-    if (!file) return false;
-    
-    // Delete the physical file
-    try {
-      const filePath = path.join(this.uploadsDir, file.filename);
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-      }
-    } catch (error) {
-      console.error('Error deleting file:', error);
+    if (!file) {
       return false;
     }
     
-    return this.files.delete(id);
+    // Delete the file from the filesystem
+    const filePath = path.join(this.uploadsDir, file.filename);
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+    
+    // Delete from database
+    const result = await db.delete(files).where(eq(files.id, id)).returning();
+    return result.length > 0;
   }
   
-  // IP Whitelist operations
   async getIpWhitelists(): Promise<IpWhitelist[]> {
-    return Array.from(this.ipWhitelists.values()).sort((a, b) => {
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-    });
+    return db.select().from(ipWhitelist).orderBy(desc(ipWhitelist.createdAt));
   }
   
   async getIpWhitelist(id: number): Promise<IpWhitelist | undefined> {
-    return this.ipWhitelists.get(id);
+    const result = await db.select().from(ipWhitelist).where(eq(ipWhitelist.id, id));
+    return result[0];
   }
   
   async getIpWhitelistByIp(ipAddress: string): Promise<IpWhitelist | undefined> {
-    return Array.from(this.ipWhitelists.values()).find(
-      (ipWhitelist) => ipWhitelist.ipAddress === ipAddress && ipWhitelist.isActive
-    );
+    const result = await db.select().from(ipWhitelist).where(eq(ipWhitelist.ipAddress, ipAddress));
+    return result[0];
   }
   
   async createIpWhitelist(insertIpWhitelist: InsertIpWhitelist): Promise<IpWhitelist> {
-    const id = this.currentIpWhitelistId++;
-    const ipWhitelist: IpWhitelist = { 
-      ...insertIpWhitelist, 
-      id, 
-      createdAt: new Date() 
-    };
-    this.ipWhitelists.set(id, ipWhitelist);
-    return ipWhitelist;
+    const [ip] = await db.insert(ipWhitelist).values(insertIpWhitelist).returning();
+    return ip;
   }
   
   async updateIpWhitelist(id: number, ipWhitelistUpdate: Partial<InsertIpWhitelist>): Promise<IpWhitelist | undefined> {
-    const ipWhitelist = await this.getIpWhitelist(id);
-    if (!ipWhitelist) return undefined;
+    const [updatedIp] = await db.update(ipWhitelist)
+      .set(ipWhitelistUpdate)
+      .where(eq(ipWhitelist.id, id))
+      .returning();
     
-    const updatedIpWhitelist: IpWhitelist = { 
-      ...ipWhitelist, 
-      ...ipWhitelistUpdate 
-    };
-    this.ipWhitelists.set(id, updatedIpWhitelist);
-    return updatedIpWhitelist;
+    return updatedIp;
   }
   
   async deleteIpWhitelist(id: number): Promise<boolean> {
-    return this.ipWhitelists.delete(id);
+    const result = await db.delete(ipWhitelist).where(eq(ipWhitelist.id, id)).returning();
+    return result.length > 0;
   }
   
-  // Access Log operations
   async getAccessLogs(): Promise<AccessLog[]> {
-    return Array.from(this.accessLogs.values()).sort((a, b) => {
-      return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
-    });
+    return db.select().from(accessLogs).orderBy(desc(accessLogs.timestamp));
   }
   
   async getAccessLog(id: number): Promise<AccessLog | undefined> {
-    return this.accessLogs.get(id);
+    const result = await db.select().from(accessLogs).where(eq(accessLogs.id, id));
+    return result[0];
   }
   
   async createAccessLog(insertAccessLog: InsertAccessLog): Promise<AccessLog> {
-    const id = this.currentAccessLogId++;
-    const accessLog: AccessLog = { 
-      ...insertAccessLog, 
-      id, 
-      timestamp: new Date() 
-    };
-    this.accessLogs.set(id, accessLog);
-    return accessLog;
+    const [log] = await db.insert(accessLogs).values(insertAccessLog).returning();
+    return log;
   }
   
-  // Dashboard statistics
   async getDashboardStats(): Promise<DashboardStats> {
-    const totalFiles = this.files.size;
-    const totalAccessRequests = this.accessLogs.size;
-    const totalWhitelistedIps = Array.from(this.ipWhitelists.values()).filter(ip => ip.isActive).length;
+    // Count total files
+    const filesResult = await db.select({ count: sql<number>`count(*)` }).from(files);
+    const totalFiles = filesResult[0].count;
     
-    // Calculate new files this week
+    // Count total access requests
+    const logsResult = await db.select({ count: sql<number>`count(*)` }).from(accessLogs);
+    const totalAccessRequests = logsResult[0].count;
+    
+    // Count whitelisted IPs
+    const ipsResult = await db.select({ count: sql<number>`count(*)` }).from(ipWhitelist);
+    const totalWhitelistedIps = ipsResult[0].count;
+    
+    // Count new files in the last week
     const oneWeekAgo = new Date();
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-    const newFilesThisWeek = Array.from(this.files.values()).filter(
-      file => new Date(file.uploadedAt) > oneWeekAgo
-    ).length;
     
-    // Calculate denied requests in last 24 hours
-    const oneDayAgo = new Date();
-    oneDayAgo.setDate(oneDayAgo.getDate() - 1);
-    const deniedRequestsLast24h = Array.from(this.accessLogs.values()).filter(
-      log => new Date(log.timestamp) > oneDayAgo && log.status === 'denied'
-    ).length;
+    const newFilesResult = await db.select({ count: sql<number>`count(*)` })
+      .from(files)
+      .where(gt(files.uploadedAt, oneWeekAgo));
     
-    // Calculate recently added IPs (last 7 days)
-    const recentlyAddedIps = Array.from(this.ipWhitelists.values()).filter(
-      ip => new Date(ip.createdAt) > oneWeekAgo
-    ).length;
+    const newFilesThisWeek = newFilesResult[0].count;
+    
+    // Count denied requests in the last 24 hours
+    const last24Hours = new Date();
+    last24Hours.setHours(last24Hours.getHours() - 24);
+    
+    const deniedResult = await db.select({ count: sql<number>`count(*)` })
+      .from(accessLogs)
+      .where(
+        and(
+          eq(accessLogs.status, 'denied'),
+          gt(accessLogs.timestamp, last24Hours)
+        )
+      );
+    
+    const deniedRequestsLast24h = deniedResult[0].count;
+    
+    // Count recently added IPs
+    const recentIpsResult = await db.select({ count: sql<number>`count(*)` })
+      .from(ipWhitelist)
+      .where(gt(ipWhitelist.createdAt, oneWeekAgo));
+    
+    const recentlyAddedIps = recentIpsResult[0].count;
     
     return {
       totalFiles,
@@ -267,18 +238,24 @@ export class MemStorage implements IStorage {
     };
   }
   
-  // IP Verification
   async isIpWhitelisted(ipAddress: string): Promise<boolean> {
-    const ipWhitelist = await this.getIpWhitelistByIp(ipAddress);
-    if (!ipWhitelist) return false;
+    const result = await db.select()
+      .from(ipWhitelist)
+      .where(
+        and(
+          eq(ipWhitelist.ipAddress, ipAddress),
+          eq(ipWhitelist.isActive, true)
+        )
+      );
     
-    // Check if the IP is still active
-    if (!ipWhitelist.isActive) return false;
+    if (result.length === 0) {
+      return false;
+    }
     
-    // Check if the IP has not expired
-    if (ipWhitelist.expiresAt && new Date(ipWhitelist.expiresAt) < new Date()) {
-      // Update the IP to be inactive since it has expired
-      await this.updateIpWhitelist(ipWhitelist.id, { isActive: false });
+    const ip = result[0];
+    
+    // Check if the whitelist entry has expired
+    if (ip.expiresAt && ip.expiresAt < new Date()) {
       return false;
     }
     
@@ -286,4 +263,5 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+// Export the database storage instance
+export const storage = new DatabaseStorage();
