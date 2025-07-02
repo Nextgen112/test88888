@@ -8,9 +8,11 @@ import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/Dashboard";
 import Login from "@/pages/Login";
 import PublicFiles from "@/pages/PublicFiles";
+import AddMyIP from "@/pages/AddMyIP";
 
 function Router() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -19,16 +21,20 @@ function Router() {
       .then(res => res.json())
       .then(data => {
         setIsAuthenticated(data.authenticated || false);
+        setUserRole(data.role || null);
         setIsLoading(false);
       })
       .catch(() => {
         setIsAuthenticated(false);
+        setUserRole(null);
         setIsLoading(false);
       });
   }, []);
 
   const handleLoginSuccess = () => {
     setIsAuthenticated(true);
+    // Refresh to get user role
+    window.location.reload();
   };
 
   const handleLogout = () => {
@@ -38,8 +44,10 @@ function Router() {
       credentials: 'include' 
     }).then(() => {
       setIsAuthenticated(false);
+      setUserRole(null);
     }).catch(() => {
       setIsAuthenticated(false);
+      setUserRole(null);
     });
   };
 
@@ -59,14 +67,27 @@ function Router() {
         <PublicFiles />
       </Route>
       <Route path="/admin">
-        {isAuthenticated ? (
+        {isAuthenticated && userRole === 'admin' ? (
           <Dashboard onLogout={handleLogout} />
         ) : (
           <Login onLoginSuccess={handleLoginSuccess} />
         )}
       </Route>
+      <Route path="/login">
+        {isAuthenticated ? (
+          userRole === 'admin' ? <Dashboard onLogout={handleLogout} /> : <AddMyIP />
+        ) : (
+          <Login onLoginSuccess={handleLoginSuccess} />
+        )}
+      </Route>
       <Route path="/">
-        <PublicFiles />
+        {!isAuthenticated ? (
+          <PublicFiles />
+        ) : userRole === 'admin' ? (
+          <Dashboard onLogout={handleLogout} />
+        ) : (
+          <AddMyIP />
+        )}
       </Route>
       <Route component={NotFound} />
     </Switch>

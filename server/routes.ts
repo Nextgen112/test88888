@@ -50,14 +50,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Check authentication status
-  app.get('/api/auth/status', (req: any, res) => {
-    if (req.session && req.session.authenticated) {
-      res.json({ 
-        authenticated: true, 
-        username: req.session.username 
+  // Check authentication status and user role
+  app.get('/api/auth/status', async (req: any, res) => {
+    if (!req.session || !req.session.authenticated || !req.session.userId) {
+      return res.json({ authenticated: false });
+    }
+
+    try {
+      const user = await storage.getUser(req.session.userId);
+      if (!user) {
+        return res.json({ authenticated: false });
+      }
+
+      res.json({
+        authenticated: true,
+        userId: user.id,
+        username: user.username,
+        role: user.role
       });
-    } else {
+    } catch (error) {
+      console.error('Error fetching user for auth status:', error);
       res.json({ authenticated: false });
     }
   });
@@ -105,55 +117,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Upload a file (protected)
-  app.post('/api/files/upload', isAuthenticated, async (req, res) => {
-    try {
-      // Apply file upload middleware
-      fileUploadMiddleware(req, res, async (err) => {
-        if (err) {
-          return res.status(400).json({ error: err.message });
-        }
-        
-        const file = req.file;
-        if (!file) {
-          return res.status(400).json({ error: 'No file uploaded' });
-        }
-        
-        // Get client IP address
-        const ipAddress = req.ip || 
-                       req.headers['x-forwarded-for'] as string || 
-                       req.socket.remoteAddress || 
-                       '0.0.0.0';
-        
-        // Store file metadata in the database
-        const newFile = await storage.createFile({
-          filename: file.filename,
-          originalFilename: file.originalname,
-          fileSize: file.size,
-          mimeType: file.mimetype,
-          uploadedBy: 1 // Default user ID (admin)
-        });
-        
-        // Log the upload
-        await storage.createAccessLog({
-          ipAddress,
-          fileId: newFile.id,
-          eventType: 'file_upload',
-          status: 'successful',
-          details: `File uploaded: ${file.originalname}`
-        });
-        
-        // Return the file info with URL
-        res.status(201).json({
-          ...newFile,
-          url: `/api/files/${newFile.id}/download`
-        });
-      });
-    } catch (error) {
-      console.error('Error uploading file:', error);
-      res.status(500).json({ error: 'Failed to upload file' });
-    }
-  });
+  // File upload functionality removed - files are manually added to server
   
   // Delete a file
   app.delete('/api/files/:id', async (req, res) => {
@@ -176,9 +140,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Download a file - requires IP verification
-  app.get('/api/files/:id/download', verifyIpMiddleware, async (req, res) => {
+  // Download a file - requires admin access + IP verification
+  app.get('/api/files/:id/download', isAuthenticated, verifyIpMiddleware, async (req, res) => {
     try {
+      // Check if current user is admin
+      const currentUser = await storage.getUser(req.session.userId!);
+      if (!currentUser || currentUser.role !== 'admin') {
+        return res.status(403).json({ error: 'Admin access required for file downloads' });
+      }
+
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
         return res.status(400).json({ error: 'Invalid file ID' });
@@ -227,9 +197,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Add IP to whitelist (protected)
+  // Add current user's IP to whitelist (for regular users)
+  app.post('/api/add-my-ip', isAuthenticated, async (req, res) => {
+    try {
+      const currentUser = await storage.getUser(req.session.userId!);
+      if (!currentUser) {
+        return res.status(401).json({ error: 'User not found' });
+      }
+
+      // Get client IP address
+      const ipAddress = req.ip || 
+                     req.headers['x-forwarded-for'] as string || 
+                     req.socket.remoteAddress || 
+                     '0.0.0.0';
+
+      // Check if IP already exists
+      const existingIp = await storage.getIpWhitelistByIp(ipAddress);
+      if (existingIp) {
+        return res.status(409).json({ error: 'Your IP address is already whitelisted' });
+      }
+
+      // Create new IP whitelist entry
+      const newIpWhitelist = await storage.createIpWhitelist({
+        ipAddress,
+        description: `Added by user: ${currentUser.username}`,
+        isActive: true,
+        expiresAt: null,
+        createdBy: currentUser.id
+      });
+
+      res.status(201).json(newIpWhitelist);
+    } catch (error) {
+      console.error('Error adding user IP to whitelist:', error);
+      res.status(500).json({ error: 'Failed to add IP to whitelist' });
+    }
+  });
+
+  // Add IP to whitelist (admin only)
   app.post('/api/ip-whitelist', isAuthenticated, async (req, res) => {
     try {
+      // Check if current user is admin
+      const currentUser = await storage.getUser(req.session.userId!);
+      if (!currentUser || currentUser.role !== 'admin') {
+        return res.status(403).json({ error: 'Admin access required' });
+      }
       // Validate request body
       const schema = z.object({
         ipAddress: z.string().min(1).max(45),
@@ -356,18 +367,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Create new user (only main admin)
+  // Create new user (admin only, max 3 admins)
   app.post('/api/users', isAuthenticated, async (req: any, res) => {
-    if (!isMainAdmin(req)) {
-      return res.status(403).json({ error: 'Only the main administrator can manage users' });
-    }
     try {
+      // Check if current user is admin
+      const currentUser = await storage.getUser(req.session.userId!);
+      if (!currentUser || currentUser.role !== 'admin') {
+        return res.status(403).json({ error: 'Admin access required' });
+      }
+
       const schema = z.object({
         username: z.string().min(3).max(50),
         password: z.string().min(6).max(100),
+        role: z.enum(['admin', 'user']).default('user'),
       });
 
       const validatedData = schema.parse(req.body);
+
+      // If creating an admin, check limit of 3
+      if (validatedData.role === 'admin') {
+        const allUsers = await storage.getUsers();
+        const adminCount = allUsers.filter(u => u.role === 'admin').length;
+        if (adminCount >= 3) {
+          return res.status(400).json({ error: 'Maximum 3 admin users allowed' });
+        }
+      }
 
       // Check if username already exists
       const existingUser = await storage.getUserByUsername(validatedData.username);
@@ -378,7 +402,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const newUser = await storage.createUser(validatedData);
       res.json({ 
         id: newUser.id, 
-        username: newUser.username 
+        username: newUser.username,
+        role: newUser.role
       });
     } catch (error) {
       console.error('Error creating user:', error);

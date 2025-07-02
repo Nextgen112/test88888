@@ -82,7 +82,8 @@ export class MemStorage implements IStorage {
     this.users.set(1, {
       id: 1,
       username: 'admin',
-      password: 'password'
+      password: 'password',
+      role: 'admin'
     });
     
     // Add localhost to IP whitelist
@@ -94,6 +95,27 @@ export class MemStorage implements IStorage {
       createdAt: new Date(),
       expiresAt: null,
       createdBy: 1
+    });
+
+    // Add some sample VIP.js files
+    this.files.set(1, {
+      id: 1,
+      filename: 'premium-script-1.vip.js',
+      originalFilename: 'premium-script.vip.js',
+      fileSize: 1024,
+      mimeType: 'application/javascript',
+      uploadedAt: new Date(),
+      uploadedBy: 1
+    });
+
+    this.files.set(2, {
+      id: 2,
+      filename: 'exclusive-module-2.vip.js',
+      originalFilename: 'exclusive-module.vip.js',
+      fileSize: 2048,
+      mimeType: 'application/javascript',
+      uploadedAt: new Date(),
+      uploadedBy: 1
     });
   }
   
@@ -112,7 +134,11 @@ export class MemStorage implements IStorage {
   
   async createUser(insertUser: InsertUser): Promise<User> {
     const id = this.currentUserId++;
-    const user: User = { ...insertUser, id };
+    const user: User = { 
+      ...insertUser, 
+      id,
+      role: insertUser.role || 'user' 
+    };
     this.users.set(id, user);
     return user;
   }
