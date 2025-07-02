@@ -109,6 +109,11 @@ VIP-Hosting is a secure file sharing and management system built with a modern T
 ```
 Changelog:
 - July 02, 2025. Initial setup
+- July 02, 2025. Added user management system with authentication
+  * Implemented login system with admin/password default credentials
+  * Added user management interface for creating/editing/deleting admin users
+  * Protected all admin routes with authentication middleware
+  * Separated public file browsing from admin functions
 ```
 
 ## User Preferences

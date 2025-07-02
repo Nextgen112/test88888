@@ -5,6 +5,7 @@ import DashboardOverview from "@/components/dashboard/DashboardOverview";
 import FileUpload from "@/components/dashboard/FileUpload";
 import IPWhitelist from "@/components/dashboard/IPWhitelist";
 import AccessLogs from "@/components/dashboard/AccessLogs";
+import UserManagement from "@/components/dashboard/UserManagement";
 import Notification from "@/components/ui/notification";
 import AccessDeniedDialog from "@/components/ui/access-denied-dialog";
 import { NotificationProps } from "@/lib/types";
@@ -117,6 +118,11 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
           {/* Access Logs Section */}
           <section id="access-logs">
             <AccessLogs />
+          </section>
+          
+          {/* User Management Section */}
+          <section id="users">
+            <UserManagement />
           </section>
         </main>
       </div>

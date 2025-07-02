@@ -305,6 +305,108 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // User Management routes (protected)
+  
+  // Get all users
+  app.get('/api/users', isAuthenticated, async (_req, res) => {
+    try {
+      const users = await storage.getUsers();
+      // Don't return passwords
+      const safeUsers = users.map(user => ({ 
+        id: user.id, 
+        username: user.username 
+      }));
+      res.json(safeUsers);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      res.status(500).json({ error: 'Failed to fetch users' });
+    }
+  });
+
+  // Create new user
+  app.post('/api/users', isAuthenticated, async (req, res) => {
+    try {
+      const schema = z.object({
+        username: z.string().min(3).max(50),
+        password: z.string().min(6).max(100),
+      });
+
+      const validatedData = schema.parse(req.body);
+
+      // Check if username already exists
+      const existingUser = await storage.getUserByUsername(validatedData.username);
+      if (existingUser) {
+        return res.status(400).json({ error: 'Username already exists' });
+      }
+
+      const newUser = await storage.createUser(validatedData);
+      res.json({ 
+        id: newUser.id, 
+        username: newUser.username 
+      });
+    } catch (error) {
+      console.error('Error creating user:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Invalid input data' });
+      }
+      res.status(500).json({ error: 'Failed to create user' });
+    }
+  });
+
+  // Update user
+  app.put('/api/users/:id', isAuthenticated, async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      const schema = z.object({
+        password: z.string().min(6).max(100).optional(),
+        username: z.string().min(3).max(50).optional(),
+      });
+
+      const validatedData = schema.parse(req.body);
+
+      // If updating username, check if it already exists
+      if (validatedData.username) {
+        const existingUser = await storage.getUserByUsername(validatedData.username);
+        if (existingUser && existingUser.id !== userId) {
+          return res.status(400).json({ error: 'Username already exists' });
+        }
+      }
+
+      const updatedUser = await storage.updateUser(userId, validatedData);
+      if (!updatedUser) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      res.json({ 
+        id: updatedUser.id, 
+        username: updatedUser.username 
+      });
+    } catch (error) {
+      console.error('Error updating user:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Invalid input data' });
+      }
+      res.status(500).json({ error: 'Failed to update user' });
+    }
+  });
+
+  // Delete user
+  app.delete('/api/users/:id', isAuthenticated, async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      const success = await storage.deleteUser(userId);
+      
+      if (!success) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      res.status(500).json({ error: 'Failed to delete user' });
+    }
+  });
+  
   // Access Logs routes
   
   // Get all access logs

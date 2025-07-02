@@ -7,7 +7,8 @@ import {
   ClipboardList, 
   Settings,
   Server,
-  Database
+  Database,
+  Users
 } from "lucide-react";
 
 interface NavItemProps {
@@ -61,6 +62,12 @@ const Sidebar: React.FC = () => {
           label="Access Logs" 
           icon={<ClipboardList className="w-5 h-5" />} 
           active={location === "/#access-logs"} 
+        />
+        <NavItem 
+          href="/#users" 
+          label="User Management" 
+          icon={<Users className="w-5 h-5" />} 
+          active={location === "/#users"} 
         />
         <NavItem 
           href="/#settings" 
