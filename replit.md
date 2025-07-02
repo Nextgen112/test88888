@@ -128,6 +128,11 @@ Changelog:
   * Changed "VIP file admin only" text to just "Admin"
   * Added demo user account (username: "user", password: "password")
   * User login automatically adds their IP to whitelist for VIP.js access
+- July 02, 2025. Fixed user creation bug and added 10 demo users
+  * Fixed issue where role field wasn't properly sent during user creation
+  * Added 10 demo users (user1-user10) with password "pass123"
+  * Cleaned up debug code and logging
+  * All user accounts now work properly with automatic IP whitelisting
 ```
 
 ## User Preferences

@@ -94,6 +94,31 @@ export class MemStorage implements IStorage {
       role: 'user'
     });
     
+    // Create 10 demo users
+    const demoUsers = [
+      { username: 'user1', password: 'pass123' },
+      { username: 'user2', password: 'pass123' },
+      { username: 'user3', password: 'pass123' },
+      { username: 'user4', password: 'pass123' },
+      { username: 'user5', password: 'pass123' },
+      { username: 'user6', password: 'pass123' },
+      { username: 'user7', password: 'pass123' },
+      { username: 'user8', password: 'pass123' },
+      { username: 'user9', password: 'pass123' },
+      { username: 'user10', password: 'pass123' }
+    ];
+
+    demoUsers.forEach((userData, index) => {
+      const userId = 3 + index; // Start from ID 3
+      this.users.set(userId, {
+        id: userId,
+        username: userData.username,
+        password: userData.password,
+        role: 'user'
+      });
+      this.currentUserId = userId; // Update counter
+    });
+    
     // Add localhost to IP whitelist
     this.ipWhitelists.set(1, {
       id: 1,
