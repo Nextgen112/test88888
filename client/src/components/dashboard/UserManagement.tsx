@@ -35,7 +35,7 @@ export default function UserManagement() {
 
   // Create user mutation
   const createUserMutation = useMutation({
-    mutationFn: (data: UserFormData) => apiRequest('POST', '/api/users', data),
+    mutationFn: (data: UserFormData) => apiRequest('POST', '/api/users', { ...data, role: 'user' }),
     onSuccess: () => {
       toast({
         title: "User Created",
