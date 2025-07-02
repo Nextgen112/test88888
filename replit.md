@@ -114,6 +114,13 @@ Changelog:
   * Added user management interface for creating/editing/deleting admin users
   * Protected all admin routes with authentication middleware
   * Separated public file browsing from admin functions
+- July 02, 2025. Implemented role-based access system
+  * Removed file upload functionality completely as requested
+  * Added maximum 3 admin users limitation
+  * Regular users can only login to add their own IP to whitelist
+  * Only admin users can download VIP.js files
+  * Created /VIP.js endpoint that serves file content directly (no download)
+  * VIP.js files are viewable/accessible at /VIP.js URL with IP verification
 ```
 
 ## User Preferences

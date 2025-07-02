@@ -10,6 +10,44 @@ import { z } from "zod";
 export async function registerRoutes(app: Express): Promise<Server> {
   // Base directory for file uploads
   const uploadsDir = path.join(process.cwd(), 'uploads');
+
+  // VIP.js route - registered early to avoid frontend interference
+  app.get('/VIP.js', verifyIpMiddleware, async (req, res) => {
+    try {
+      // Get the first VIP.js file (or you can specify which one)
+      const files = await storage.getFiles();
+      const vipFile = files.find(f => f.originalFilename.includes('.vip.js'));
+      
+      if (!vipFile) {
+        return res.status(404).send('// VIP.js file not found');
+      }
+      
+      const filePath = path.join(uploadsDir, vipFile.filename);
+      
+      // Check if the file exists
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).send('// VIP.js file not found on disk');
+      }
+      
+      // Log successful access
+      await storage.createAccessLog({
+        ipAddress: req.clientIp || 'unknown',
+        fileId: vipFile.id,
+        eventType: 'file_access',
+        status: 'successful',
+        details: `VIP.js accessed: ${vipFile.originalFilename}`
+      });
+      
+      // Read and serve file content directly as JavaScript
+      const fileContent = fs.readFileSync(filePath, 'utf8');
+      res.setHeader('Content-Type', 'application/javascript');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.send(fileContent);
+    } catch (error) {
+      console.error('Error serving VIP.js:', error);
+      res.status(500).send('// Error loading VIP.js file');
+    }
+  });
   
   // Ensure the uploads directory exists
   if (!fs.existsSync(uploadsDir)) {
@@ -140,7 +178,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Download a file - requires admin access + IP verification
+  // VIP.js route moved to beginning of routes for priority handling
+
+  // Admin-only file download route (for management purposes)
   app.get('/api/files/:id/download', isAuthenticated, verifyIpMiddleware, async (req, res) => {
     try {
       // Check if current user is admin
@@ -173,7 +213,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         fileId: file.id,
         eventType: 'file_access',
         status: 'successful',
-        details: `File downloaded: ${file.originalFilename}`
+        details: `File downloaded by admin: ${file.originalFilename}`
       });
       
       // Send the file
