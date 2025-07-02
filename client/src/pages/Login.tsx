@@ -26,10 +26,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     mutationFn: (data: LoginFormData) => 
       apiRequest("POST", "/api/auth/login", data),
     onSuccess: (response) => {
-      // Store login status
-      localStorage.setItem('isAuthenticated', 'true');
-      localStorage.setItem('authToken', response.token || 'authenticated');
-      
+      // Session is handled by cookies, no need to store anything
       toast({
         title: "Login Successful",
         description: "Welcome to VIP File Management",

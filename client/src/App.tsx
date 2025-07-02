@@ -14,10 +14,17 @@ function Router() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check if user is authenticated
-    const authStatus = localStorage.getItem('isAuthenticated');
-    setIsAuthenticated(authStatus === 'true');
-    setIsLoading(false);
+    // Check authentication status with the server
+    fetch('/api/auth/status', { credentials: 'include' })
+      .then(res => res.json())
+      .then(data => {
+        setIsAuthenticated(data.authenticated || false);
+        setIsLoading(false);
+      })
+      .catch(() => {
+        setIsAuthenticated(false);
+        setIsLoading(false);
+      });
   }, []);
 
   const handleLoginSuccess = () => {
@@ -25,9 +32,15 @@ function Router() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('isAuthenticated');
-    localStorage.removeItem('authToken');
-    setIsAuthenticated(false);
+    // Call logout endpoint to destroy session
+    fetch('/api/auth/logout', { 
+      method: 'POST',
+      credentials: 'include' 
+    }).then(() => {
+      setIsAuthenticated(false);
+    }).catch(() => {
+      setIsAuthenticated(false);
+    });
   };
 
   if (isLoading) {

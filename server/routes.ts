@@ -16,15 +16,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     fs.mkdirSync(uploadsDir, { recursive: true });
   }
 
-  // Simple authentication middleware
+  // Session-based authentication middleware
   const isAuthenticated = (req: any, res: any, next: any) => {
-    const authHeader = req.headers.authorization;
-    const isAuth = authHeader === 'Bearer authenticated' || req.headers['x-auth'] === 'authenticated';
-    
-    if (!isAuth) {
-      return res.status(401).json({ error: 'Unauthorized' });
+    if (req.session && req.session.authenticated && req.session.userId) {
+      return next();
     }
-    next();
+    return res.status(401).json({ error: 'Unauthorized' });
   };
 
   // Authentication routes
@@ -32,11 +29,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { username, password } = req.body;
       
-      if (username === 'admin' && password === 'password') {
+      // Check against stored users
+      const user = await storage.getUserByUsername(username);
+      if (user && user.password === password) {
+        // Set session
+        req.session.authenticated = true;
+        req.session.userId = user.id;
+        req.session.username = user.username;
+        
         res.json({ 
           success: true, 
-          message: 'Login successful',
-          token: 'authenticated'
+          message: 'Login successful'
         });
       } else {
         res.status(401).json({ error: 'Invalid credentials' });
@@ -45,6 +48,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error('Login error:', error);
       res.status(500).json({ error: 'Login failed' });
     }
+  });
+  
+  // Check authentication status
+  app.get('/api/auth/status', (req: any, res) => {
+    if (req.session && req.session.authenticated) {
+      res.json({ 
+        authenticated: true, 
+        username: req.session.username 
+      });
+    } else {
+      res.json({ authenticated: false });
+    }
+  });
+
+  // Logout route
+  app.post('/api/auth/logout', (req: any, res) => {
+    req.session.destroy((err: any) => {
+      if (err) {
+        return res.status(500).json({ error: 'Could not log out' });
+      }
+      res.json({ success: true, message: 'Logged out successfully' });
+    });
   });
 
   // API routes - all prefixed with /api
@@ -307,8 +332,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // User Management routes (protected)
   
-  // Get all users
-  app.get('/api/users', isAuthenticated, async (_req, res) => {
+  // Check if user is main admin
+  const isMainAdmin = (req: any) => {
+    return req.session && req.session.authenticated && req.session.username === 'admin';
+  };
+
+  // Get all users (only main admin)
+  app.get('/api/users', isAuthenticated, async (req: any, res) => {
+    if (!isMainAdmin(req)) {
+      return res.status(403).json({ error: 'Only the main administrator can manage users' });
+    }
     try {
       const users = await storage.getUsers();
       // Don't return passwords
@@ -323,8 +356,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Create new user
-  app.post('/api/users', isAuthenticated, async (req, res) => {
+  // Create new user (only main admin)
+  app.post('/api/users', isAuthenticated, async (req: any, res) => {
+    if (!isMainAdmin(req)) {
+      return res.status(403).json({ error: 'Only the main administrator can manage users' });
+    }
     try {
       const schema = z.object({
         username: z.string().min(3).max(50),
@@ -353,8 +389,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Update user
-  app.put('/api/users/:id', isAuthenticated, async (req, res) => {
+  // Update user (only main admin)
+  app.put('/api/users/:id', isAuthenticated, async (req: any, res) => {
+    if (!isMainAdmin(req)) {
+      return res.status(403).json({ error: 'Only the main administrator can manage users' });
+    }
     try {
       const userId = parseInt(req.params.id);
       const schema = z.object({
@@ -390,8 +429,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Delete user
-  app.delete('/api/users/:id', isAuthenticated, async (req, res) => {
+  // Delete user (only main admin)
+  app.delete('/api/users/:id', isAuthenticated, async (req: any, res) => {
+    if (!isMainAdmin(req)) {
+      return res.status(403).json({ error: 'Only the main administrator can manage users' });
+    }
     try {
       const userId = parseInt(req.params.id);
       const success = await storage.deleteUser(userId);

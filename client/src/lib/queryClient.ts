@@ -12,23 +12,17 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<any> {
-  const authToken = localStorage.getItem('authToken');
-  
   const headers: Record<string, string> = {};
   
   if (data && !(data instanceof FormData)) {
     headers["Content-Type"] = "application/json";
-  }
-  
-  if (authToken) {
-    headers["Authorization"] = `Bearer ${authToken}`;
   }
 
   const res = await fetch(url, {
     method,
     headers,
     body: data instanceof FormData ? data : (data ? JSON.stringify(data) : undefined),
-    credentials: "include",
+    credentials: "include", // This ensures cookies are sent with requests
   });
 
   await throwIfResNotOk(res);
