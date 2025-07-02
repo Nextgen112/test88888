@@ -10,7 +10,11 @@ import AccessDeniedDialog from "@/components/ui/access-denied-dialog";
 import { NotificationProps } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 
-const Dashboard: React.FC = () => {
+interface DashboardProps {
+  onLogout?: () => void;
+}
+
+const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [notification, setNotification] = useState<NotificationProps>({
     show: false,

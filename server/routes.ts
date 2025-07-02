@@ -16,10 +16,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     fs.mkdirSync(uploadsDir, { recursive: true });
   }
 
+  // Simple authentication middleware
+  const isAuthenticated = (req: any, res: any, next: any) => {
+    const authHeader = req.headers.authorization;
+    const isAuth = authHeader === 'Bearer authenticated' || req.headers['x-auth'] === 'authenticated';
+    
+    if (!isAuth) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    next();
+  };
+
+  // Authentication routes
+  app.post('/api/auth/login', async (req, res) => {
+    try {
+      const { username, password } = req.body;
+      
+      if (username === 'admin' && password === 'password') {
+        res.json({ 
+          success: true, 
+          message: 'Login successful',
+          token: 'authenticated'
+        });
+      } else {
+        res.status(401).json({ error: 'Invalid credentials' });
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      res.status(500).json({ error: 'Login failed' });
+    }
+  });
+
   // API routes - all prefixed with /api
   
-  // Dashboard stats
-  app.get('/api/stats', async (_req, res) => {
+  // Dashboard stats (protected)
+  app.get('/api/stats', isAuthenticated, async (_req, res) => {
     try {
       const stats = await storage.getDashboardStats();
       res.json(stats);
@@ -49,8 +80,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Upload a file
-  app.post('/api/files/upload', async (req, res) => {
+  // Upload a file (protected)
+  app.post('/api/files/upload', isAuthenticated, async (req, res) => {
     try {
       // Apply file upload middleware
       fileUploadMiddleware(req, res, async (err) => {
@@ -160,8 +191,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // IP Whitelist routes
   
-  // Get all IP whitelist entries
-  app.get('/api/ip-whitelist', async (_req, res) => {
+  // Get all IP whitelist entries (protected)
+  app.get('/api/ip-whitelist', isAuthenticated, async (_req, res) => {
     try {
       const ipWhitelists = await storage.getIpWhitelists();
       res.json(ipWhitelists);
@@ -171,8 +202,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Add IP to whitelist
-  app.post('/api/ip-whitelist', async (req, res) => {
+  // Add IP to whitelist (protected)
+  app.post('/api/ip-whitelist', isAuthenticated, async (req, res) => {
     try {
       // Validate request body
       const schema = z.object({
