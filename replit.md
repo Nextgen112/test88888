@@ -121,6 +121,13 @@ Changelog:
   * Only admin users can download VIP.js files
   * Created /VIP.js endpoint that serves file content directly (no download)
   * VIP.js files are viewable/accessible at /VIP.js URL with IP verification
+- July 02, 2025. Enhanced login system with separate admin and user panels
+  * Created separate /admin-login and /user-login endpoints and pages
+  * Added automatic IP detection and whitelisting when users login
+  * Hidden password display in login forms for security
+  * Changed "VIP file admin only" text to just "Admin"
+  * Added demo user account (username: "user", password: "password")
+  * User login automatically adds their IP to whitelist for VIP.js access
 ```
 
 ## User Preferences

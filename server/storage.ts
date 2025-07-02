@@ -63,8 +63,8 @@ export class MemStorage implements IStorage {
     this.ipWhitelists = new Map();
     this.accessLogs = new Map();
     
-    this.currentUserId = 1;
-    this.currentFileId = 1;
+    this.currentUserId = 2; // Start from 2 since we'll have admin (1) and user (2)
+    this.currentFileId = 2; // Start from 2 since we have 2 demo files
     this.currentIpWhitelistId = 1;
     this.currentAccessLogId = 1;
     
@@ -84,6 +84,14 @@ export class MemStorage implements IStorage {
       username: 'admin',
       password: 'password',
       role: 'admin'
+    });
+    
+    // Create a demo user
+    this.users.set(2, {
+      id: 2,
+      username: 'user',
+      password: 'password',
+      role: 'user'
     });
     
     // Add localhost to IP whitelist

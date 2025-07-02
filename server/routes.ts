@@ -63,17 +63,102 @@ export async function registerRoutes(app: Express): Promise<Server> {
   };
 
   // Authentication routes
+  // Admin login endpoint
+  app.post('/api/auth/admin-login', async (req, res) => {
+    try {
+      const { username, password } = req.body;
+      
+      if (!username || !password) {
+        return res.status(400).json({ error: 'Username and password are required' });
+      }
+      
+      const user = await storage.getUserByUsername(username);
+      if (!user || user.password !== password || user.role !== 'admin') {
+        return res.status(401).json({ error: 'Invalid admin credentials' });
+      }
+      
+      // Set session data
+      req.session.authenticated = true;
+      req.session.userId = user.id;
+      req.session.username = user.username;
+      req.session.role = user.role;
+      
+      res.json({ success: true, message: 'Admin login successful' });
+    } catch (error) {
+      console.error('Admin login error:', error);
+      res.status(500).json({ error: 'Admin login failed' });
+    }
+  });
+
+  // User login endpoint with automatic IP whitelisting
+  app.post('/api/auth/user-login', async (req, res) => {
+    try {
+      const { username, password } = req.body;
+      
+      if (!username || !password) {
+        return res.status(400).json({ error: 'Username and password are required' });
+      }
+      
+      const user = await storage.getUserByUsername(username);
+      if (!user || user.password !== password || user.role !== 'user') {
+        return res.status(401).json({ error: 'Invalid user credentials' });
+      }
+      
+      // Get user's IP address
+      const userIp = req.clientIp || req.ip || 'unknown';
+      
+      // Check if IP is already whitelisted
+      const existingIpEntry = await storage.getIpWhitelistByIp(userIp);
+      
+      if (!existingIpEntry) {
+        // Automatically add user's IP to whitelist
+        await storage.createIpWhitelist({
+          ipAddress: userIp,
+          description: `Auto-added for user: ${username}`,
+          isActive: true,
+          expiresAt: null, // Never expires for user login
+          createdBy: user.id
+        });
+      }
+      
+      // Set session data
+      req.session.authenticated = true;
+      req.session.userId = user.id;
+      req.session.username = user.username;
+      req.session.role = user.role;
+      
+      // Log the access
+      await storage.createAccessLog({
+        ipAddress: userIp,
+        eventType: 'user_login',
+        status: 'successful',
+        fileId: null,
+        details: `User ${username} logged in, IP automatically whitelisted`
+      });
+      
+      res.json({ 
+        success: true, 
+        message: 'User login successful', 
+        ipAdded: !existingIpEntry,
+        userIp: userIp
+      });
+    } catch (error) {
+      console.error('User login error:', error);
+      res.status(500).json({ error: 'User login failed' });
+    }
+  });
+
+  // Keep old login for backward compatibility
   app.post('/api/auth/login', async (req, res) => {
     try {
       const { username, password } = req.body;
       
-      // Check against stored users
       const user = await storage.getUserByUsername(username);
       if (user && user.password === password) {
-        // Set session
         req.session.authenticated = true;
         req.session.userId = user.id;
         req.session.username = user.username;
+        req.session.role = user.role;
         
         res.json({ 
           success: true, 

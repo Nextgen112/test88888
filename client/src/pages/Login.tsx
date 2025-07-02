@@ -54,7 +54,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
           <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 mb-4">
             <Shield className="h-6 w-6 text-primary" />
           </div>
-          <CardTitle className="text-2xl font-bold">VIP File Admin</CardTitle>
+          <CardTitle className="text-2xl font-bold">Admin</CardTitle>
           <p className="text-gray-600 text-sm">Sign in to manage IP whitelist</p>
         </CardHeader>
         

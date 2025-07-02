@@ -7,6 +7,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/Dashboard";
 import Login from "@/pages/Login";
+import AdminLogin from "@/pages/AdminLogin";
+import UserLogin from "@/pages/UserLogin";
 import PublicFiles from "@/pages/PublicFiles";
 import AddMyIP from "@/pages/AddMyIP";
 
@@ -66,11 +68,25 @@ function Router() {
       <Route path="/vip.js">
         <PublicFiles />
       </Route>
+      <Route path="/admin-login">
+        {isAuthenticated && userRole === 'admin' ? (
+          <Dashboard onLogout={handleLogout} />
+        ) : (
+          <AdminLogin onLoginSuccess={handleLoginSuccess} />
+        )}
+      </Route>
+      <Route path="/user-login">
+        {isAuthenticated && userRole === 'user' ? (
+          <AddMyIP />
+        ) : (
+          <UserLogin onLoginSuccess={handleLoginSuccess} />
+        )}
+      </Route>
       <Route path="/admin">
         {isAuthenticated && userRole === 'admin' ? (
           <Dashboard onLogout={handleLogout} />
         ) : (
-          <Login onLoginSuccess={handleLoginSuccess} />
+          <AdminLogin onLoginSuccess={handleLoginSuccess} />
         )}
       </Route>
       <Route path="/login">
@@ -82,7 +98,7 @@ function Router() {
       </Route>
       <Route path="/">
         {!isAuthenticated ? (
-          <PublicFiles />
+          <AdminLogin onLoginSuccess={handleLoginSuccess} />
         ) : userRole === 'admin' ? (
           <Dashboard onLogout={handleLogout} />
         ) : (
