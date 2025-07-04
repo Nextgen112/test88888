@@ -11,6 +11,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Base directory for file uploads
   const uploadsDir = path.join(process.cwd(), 'uploads');
 
+  // Handle preflight OPTIONS request for CORS
+  app.options('/VIP.js', (req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader('Access-Control-Max-Age', '86400'); // 24 hours
+    res.status(200).end();
+  });
+
   // VIP.js route - registered early to avoid frontend interference
   app.get('/VIP.js', verifyIpMiddleware, async (req, res) => {
     try {
@@ -40,6 +49,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Read and serve file content directly as JavaScript
       const fileContent = fs.readFileSync(filePath, 'utf8');
+      
+      // Set CORS headers to allow cross-origin requests
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Methods', 'GET');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
       res.setHeader('Content-Type', 'application/javascript');
       res.setHeader('Cache-Control', 'no-cache');
       res.send(fileContent);
