@@ -134,10 +134,20 @@ export default function UserManagement() {
 
   const handleUpdateUser = (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingUser && formData.password) {
+    if (editingUser && (formData.username || formData.password)) {
+      const updateData: Partial<UserFormData> = {};
+      
+      if (formData.username && formData.username !== editingUser.username) {
+        updateData.username = formData.username;
+      }
+      
+      if (formData.password) {
+        updateData.password = formData.password;
+      }
+      
       updateUserMutation.mutate({
         id: editingUser.id,
-        data: { password: formData.password }
+        data: updateData
       });
     }
   };
@@ -332,23 +342,37 @@ export default function UserManagement() {
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Update User Password</DialogTitle>
+            <DialogTitle>Edit User</DialogTitle>
             <DialogDescription>
-              Change the password for {editingUser?.username}
+              Update username and/or password for {editingUser?.username}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleUpdateUser} className="space-y-4">
             <div>
-              <Label htmlFor="edit-password">New Password</Label>
+              <Label htmlFor="edit-username">Username</Label>
+              <Input
+                id="edit-username"
+                type="text"
+                value={formData.username}
+                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                placeholder="Enter username"
+                required
+                minLength={3}
+              />
+            </div>
+            <div>
+              <Label htmlFor="edit-password">New Password (Optional)</Label>
               <Input
                 id="edit-password"
                 type="password"
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                placeholder="Enter new password"
-                required
+                placeholder="Enter new password (leave empty to keep current)"
                 minLength={6}
               />
+              <p className="text-xs text-gray-500 mt-1">
+                Leave empty to keep current password
+              </p>
             </div>
             <div className="flex justify-end gap-2">
               <Button
@@ -359,7 +383,7 @@ export default function UserManagement() {
                 Cancel
               </Button>
               <Button type="submit" disabled={updateUserMutation.isPending}>
-                {updateUserMutation.isPending ? 'Updating...' : 'Update Password'}
+                {updateUserMutation.isPending ? 'Updating...' : 'Update User'}
               </Button>
             </div>
           </form>
