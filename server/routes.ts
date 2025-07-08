@@ -353,7 +353,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check if IP already exists
       const existingIp = await storage.getIpWhitelistByIp(ipAddress);
       if (existingIp) {
-        return res.status(409).json({ error: 'Your IP address is already whitelisted' });
+        return res.status(200).json({ 
+          success: true, 
+          message: 'Your IP address is already whitelisted',
+          ipAddress: existingIp.ipAddress,
+          alreadyExists: true
+        });
       }
 
       // Create new IP whitelist entry

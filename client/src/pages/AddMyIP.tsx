@@ -11,11 +11,18 @@ export default function AddMyIP() {
 
   const addMyIPMutation = useMutation({
     mutationFn: () => apiRequest('POST', '/api/add-my-ip', {}),
-    onSuccess: () => {
-      toast({
-        title: "Success",
-        description: "Your IP address has been added to the allowed list!",
-      });
+    onSuccess: (data: any) => {
+      if (data.alreadyExists) {
+        toast({
+          title: "Already Whitelisted",
+          description: "Your IP address is already in the allowed list. You can access VIP.js files!",
+        });
+      } else {
+        toast({
+          title: "Success",
+          description: "Your IP address has been added to the allowed list!",
+        });
+      }
       queryClient.invalidateQueries({ queryKey: ['/api/ip-whitelist'] });
     },
     onError: (error: Error) => {
