@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
 import { queryClient } from '@/lib/queryClient';
-import { Trash2, Edit, Plus, User } from 'lucide-react';
+import { Trash2, Edit, Plus, User, Shield } from 'lucide-react';
 
 interface User {
   id: number;
@@ -24,6 +24,7 @@ interface UserFormData {
 export default function UserManagement() {
   const { toast } = useToast();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isCreateAdminDialogOpen, setIsCreateAdminDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [formData, setFormData] = useState<UserFormData>({ username: '', password: '' });
@@ -39,7 +40,7 @@ export default function UserManagement() {
     onSuccess: () => {
       toast({
         title: "User Created",
-        description: "New admin user has been created successfully.",
+        description: "New user has been created successfully.",
       });
       queryClient.invalidateQueries({ queryKey: ['/api/users'] });
       setIsCreateDialogOpen(false);
@@ -49,6 +50,27 @@ export default function UserManagement() {
       toast({
         title: "Error",
         description: error.message || "Failed to create user",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Create admin mutation
+  const createAdminMutation = useMutation({
+    mutationFn: (data: UserFormData) => apiRequest('POST', '/api/users', { ...data, role: 'admin' }),
+    onSuccess: () => {
+      toast({
+        title: "Admin Created",
+        description: "New admin user has been created successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/users'] });
+      setIsCreateAdminDialogOpen(false);
+      setFormData({ username: '', password: '' });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create admin",
         variant: "destructive",
       });
     },
@@ -103,6 +125,13 @@ export default function UserManagement() {
     }
   };
 
+  const handleCreateAdmin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (formData.username && formData.password) {
+      createAdminMutation.mutate(formData);
+    }
+  };
+
   const handleUpdateUser = (e: React.FormEvent) => {
     e.preventDefault();
     if (editingUser && formData.password) {
@@ -142,60 +171,117 @@ export default function UserManagement() {
               Manage admin users who can access the system
             </CardDescription>
           </div>
-          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Add User
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Create New User</DialogTitle>
-                <DialogDescription>
-                  Add a new admin user to the system
-                </DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleCreateUser} className="space-y-4">
-                <div>
-                  <Label htmlFor="create-username">Username</Label>
-                  <Input
-                    id="create-username"
-                    type="text"
-                    value={formData.username}
-                    onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                    placeholder="Enter username"
-                    required
-                    minLength={3}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="create-password">Password</Label>
-                  <Input
-                    id="create-password"
-                    type="password"
-                    value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    placeholder="Enter password"
-                    required
-                    minLength={6}
-                  />
-                </div>
-                <div className="flex justify-end gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setIsCreateDialogOpen(false)}
-                  >
-                    Cancel
-                  </Button>
-                  <Button type="submit" disabled={createUserMutation.isPending}>
-                    {createUserMutation.isPending ? 'Creating...' : 'Create User'}
-                  </Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
+          <div className="flex gap-2">
+            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add User
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Create New User</DialogTitle>
+                  <DialogDescription>
+                    Add a new regular user to the system
+                  </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleCreateUser} className="space-y-4">
+                  <div>
+                    <Label htmlFor="create-username">Username</Label>
+                    <Input
+                      id="create-username"
+                      type="text"
+                      value={formData.username}
+                      onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                      placeholder="Enter username"
+                      required
+                      minLength={3}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="create-password">Password</Label>
+                    <Input
+                      id="create-password"
+                      type="password"
+                      value={formData.password}
+                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                      placeholder="Enter password"
+                      required
+                      minLength={6}
+                    />
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setIsCreateDialogOpen(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button type="submit" disabled={createUserMutation.isPending}>
+                      {createUserMutation.isPending ? 'Creating...' : 'Create User'}
+                    </Button>
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
+
+            <Dialog open={isCreateAdminDialogOpen} onOpenChange={setIsCreateAdminDialogOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Shield className="h-4 w-4 mr-2" />
+                  Add Admin
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Create New Admin</DialogTitle>
+                  <DialogDescription>
+                    Add a new admin user with full system access
+                  </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleCreateAdmin} className="space-y-4">
+                  <div>
+                    <Label htmlFor="create-admin-username">Username</Label>
+                    <Input
+                      id="create-admin-username"
+                      type="text"
+                      value={formData.username}
+                      onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                      placeholder="Enter admin username"
+                      required
+                      minLength={3}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="create-admin-password">Password</Label>
+                    <Input
+                      id="create-admin-password"
+                      type="password"
+                      value={formData.password}
+                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                      placeholder="Enter admin password"
+                      required
+                      minLength={6}
+                    />
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setIsCreateAdminDialogOpen(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button type="submit" disabled={createAdminMutation.isPending}>
+                      {createAdminMutation.isPending ? 'Creating...' : 'Create Admin'}
+                    </Button>
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
