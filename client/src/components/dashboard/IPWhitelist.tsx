@@ -18,6 +18,8 @@ interface AddIpFormData {
 
 const IPWhitelist: React.FC = () => {
   const [showAddForm, setShowAddForm] = useState(false);
+  const [showEditForm, setShowEditForm] = useState(false);
+  const [editingIp, setEditingIp] = useState<any>(null);
   const [formData, setFormData] = useState<AddIpFormData>({
     ipAddress: "",
     description: "",
@@ -79,6 +81,36 @@ const IPWhitelist: React.FC = () => {
     },
   });
 
+  const updateIpMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: AddIpFormData }) => 
+      apiRequest("PUT", `/api/ip-whitelist/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/ip-whitelist'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/stats'] });
+      
+      toast({
+        title: "Success",
+        description: "IP address updated successfully",
+      });
+      
+      // Reset form and hide it
+      setFormData({
+        ipAddress: "",
+        description: "",
+        expiresAt: "",
+      });
+      setShowEditForm(false);
+      setEditingIp(null);
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update IP address",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
@@ -87,17 +119,14 @@ const IPWhitelist: React.FC = () => {
     }));
   };
 
-  const handleAddIp = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    // Basic validation
+  const validateForm = () => {
     if (!formData.ipAddress.trim()) {
       toast({
         title: "Validation Error",
         description: "IP address is required",
         variant: "destructive",
       });
-      return;
+      return false;
     }
     
     // Validate IP address format with regex
@@ -108,7 +137,7 @@ const IPWhitelist: React.FC = () => {
         description: "Invalid IP address format",
         variant: "destructive",
       });
-      return;
+      return false;
     }
     
     if (!formData.description.trim()) {
@@ -117,11 +146,27 @@ const IPWhitelist: React.FC = () => {
         description: "Description is required",
         variant: "destructive",
       });
-      return;
+      return false;
     }
     
-    // Submit the form
-    addIpMutation.mutate(formData);
+    return true;
+  };
+
+  const handleAddIp = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (validateForm()) {
+      addIpMutation.mutate(formData);
+    }
+  };
+
+  const handleEditIp = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (validateForm() && editingIp) {
+      updateIpMutation.mutate({
+        id: editingIp.id,
+        data: formData
+      });
+    }
   };
 
   const handleDeleteIp = (id: number) => {
@@ -129,6 +174,36 @@ const IPWhitelist: React.FC = () => {
     if (confirmDelete) {
       deleteIpMutation.mutate(id);
     }
+  };
+
+  const handleEditClick = (ip: any) => {
+    setEditingIp(ip);
+    setFormData({
+      ipAddress: ip.ipAddress,
+      description: ip.description,
+      expiresAt: ip.expiresAt ? new Date(ip.expiresAt).toISOString().split('T')[0] : "",
+    });
+    setShowEditForm(true);
+    setShowAddForm(false);
+  };
+
+  const handleCancelEdit = () => {
+    setShowEditForm(false);
+    setEditingIp(null);
+    setFormData({
+      ipAddress: "",
+      description: "",
+      expiresAt: "",
+    });
+  };
+
+  const handleCancelAdd = () => {
+    setShowAddForm(false);
+    setFormData({
+      ipAddress: "",
+      description: "",
+      expiresAt: "",
+    });
   };
 
   const getIpStatusBadge = (ip: any) => {
@@ -166,7 +241,11 @@ const IPWhitelist: React.FC = () => {
     <Card className="mb-8">
       <CardHeader className="py-3 px-4 bg-gray-50 border-b border-gray-200 flex flex-row items-center justify-between">
         <CardTitle className="font-medium text-dark">IP Restrictions</CardTitle>
-        <Button size="sm" onClick={() => setShowAddForm(true)}>
+        <Button size="sm" onClick={() => {
+          setShowAddForm(true);
+          setShowEditForm(false);
+          setEditingIp(null);
+        }}>
           <Plus className="h-4 w-4 mr-1.5" /> Add IP
         </Button>
       </CardHeader>
@@ -213,12 +292,7 @@ const IPWhitelist: React.FC = () => {
                         <button 
                           className="p-1 text-gray-500 hover:text-primary" 
                           title="Edit"
-                          onClick={() => {
-                            toast({
-                              title: "Edit IP",
-                              description: "Editing will be available in the next version",
-                            });
-                          }}
+                          onClick={() => handleEditClick(ip)}
                         >
                           <Edit className="h-4 w-4" />
                         </button>
@@ -283,7 +357,7 @@ const IPWhitelist: React.FC = () => {
                 <Button 
                   type="button" 
                   variant="secondary"
-                  onClick={() => setShowAddForm(false)}
+                  onClick={handleCancelAdd}
                 >
                   Cancel
                 </Button>
@@ -292,6 +366,69 @@ const IPWhitelist: React.FC = () => {
                   disabled={addIpMutation.isPending}
                 >
                   {addIpMutation.isPending ? "Adding..." : "Add IP"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        )}
+        
+        {/* Edit IP Form */}
+        {showEditForm && editingIp && (
+          <div className="mt-4 bg-blue-50 border border-blue-200 rounded-md p-4">
+            <h4 className="text-sm font-medium text-dark mb-3">Edit IP Address: {editingIp.ipAddress}</h4>
+            <form className="space-y-3" onSubmit={handleEditIp}>
+              <div>
+                <Label htmlFor="edit-ipAddress">IP Address</Label>
+                <Input 
+                  type="text" 
+                  id="edit-ipAddress" 
+                  name="ipAddress"
+                  placeholder="e.g. 192.168.1.1"
+                  value={formData.ipAddress}
+                  onChange={handleInputChange}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-description">Description</Label>
+                <Input 
+                  type="text" 
+                  id="edit-description" 
+                  name="description"
+                  placeholder="e.g. Office Network"
+                  value={formData.description}
+                  onChange={handleInputChange}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-expiresAt">Expiry Date (Optional)</Label>
+                <Input 
+                  type="date" 
+                  id="edit-expiresAt" 
+                  name="expiresAt"
+                  min={new Date().toISOString().split('T')[0]}
+                  value={formData.expiresAt}
+                  onChange={handleInputChange}
+                  className="mt-1"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Leave empty for permanent access. Current: {editingIp.expiresAt ? formatDate(editingIp.expiresAt) : "Permanent"}
+                </p>
+              </div>
+              <div className="flex justify-end space-x-2">
+                <Button 
+                  type="button" 
+                  variant="secondary"
+                  onClick={handleCancelEdit}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  type="submit" 
+                  disabled={updateIpMutation.isPending}
+                >
+                  {updateIpMutation.isPending ? "Updating..." : "Update IP"}
                 </Button>
               </div>
             </form>
