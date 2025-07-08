@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,11 +9,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
 import { queryClient } from '@/lib/queryClient';
-import { Trash2, Edit, Plus, User, Shield } from 'lucide-react';
+import { Trash2, Edit, Plus, User, Shield, Eye, EyeOff } from 'lucide-react';
 
 interface User {
   id: number;
   username: string;
+}
+
+interface UserWithIps extends User {
+  ipAddresses?: string[];
 }
 
 interface UserFormData {
@@ -28,10 +32,22 @@ export default function UserManagement() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [formData, setFormData] = useState<UserFormData>({ username: '', password: '' });
+  const [showPassword, setShowPassword] = useState(false);
+  const [usersWithIps, setUsersWithIps] = useState<UserWithIps[]>([]);
 
   // Fetch users
   const { data: users = [], isLoading } = useQuery<User[]>({
     queryKey: ['/api/users'],
+  });
+
+  // Fetch IP whitelist to match with users
+  const { data: ipWhitelist = [] } = useQuery({
+    queryKey: ['/api/ip-whitelist'],
+  });
+
+  // Fetch access logs to find user IP associations
+  const { data: accessLogs = [] } = useQuery({
+    queryKey: ['/api/access-logs'],
   });
 
   // Create user mutation
@@ -155,8 +171,59 @@ export default function UserManagement() {
   const openEditDialog = (user: User) => {
     setEditingUser(user);
     setFormData({ username: user.username, password: '' });
+    setShowPassword(false);
     setIsEditDialogOpen(true);
   };
+
+  // Process users to include their IP addresses
+  React.useEffect(() => {
+    const processUsersWithIps = () => {
+      const userIpMap: { [key: string]: string[] } = {};
+      
+      // Get IPs from access logs where users added their IP
+      accessLogs.forEach((log: any) => {
+        if (log.eventType === 'user_ip_add' && log.userId) {
+          const user = users.find(u => u.id === log.userId);
+          if (user) {
+            if (!userIpMap[user.username]) {
+              userIpMap[user.username] = [];
+            }
+            if (!userIpMap[user.username].includes(log.ipAddress)) {
+              userIpMap[user.username].push(log.ipAddress);
+            }
+          }
+        }
+      });
+
+      // Also check IP whitelist descriptions for user associations
+      ipWhitelist.forEach((ip: any) => {
+        const descriptionLower = ip.description.toLowerCase();
+        users.forEach(user => {
+          if (descriptionLower.includes(user.username.toLowerCase()) || 
+              descriptionLower.includes('user:') || 
+              descriptionLower.includes(user.username)) {
+            if (!userIpMap[user.username]) {
+              userIpMap[user.username] = [];
+            }
+            if (!userIpMap[user.username].includes(ip.ipAddress)) {
+              userIpMap[user.username].push(ip.ipAddress);
+            }
+          }
+        });
+      });
+
+      const processedUsers = users.map(user => ({
+        ...user,
+        ipAddresses: userIpMap[user.username] || []
+      }));
+
+      setUsersWithIps(processedUsers);
+    };
+
+    if (users.length > 0) {
+      processUsersWithIps();
+    }
+  }, [users, ipWhitelist, accessLogs]);
 
   const handleDeleteUser = (id: number, username: string) => {
     if (confirm(`Are you sure you want to delete user "${username}"?`)) {
@@ -300,14 +367,31 @@ export default function UserManagement() {
             <TableRow>
               <TableHead>ID</TableHead>
               <TableHead>Username</TableHead>
+              <TableHead>Associated IPs</TableHead>
               <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {users.map((user) => (
+            {usersWithIps.map((user) => (
               <TableRow key={user.id}>
                 <TableCell>{user.id}</TableCell>
                 <TableCell>{user.username}</TableCell>
+                <TableCell>
+                  <div className="flex flex-wrap gap-1">
+                    {user.ipAddresses && user.ipAddresses.length > 0 ? (
+                      user.ipAddresses.map((ip, index) => (
+                        <span 
+                          key={index}
+                          className="px-2 py-1 text-xs font-mono bg-blue-100 text-blue-800 rounded"
+                        >
+                          {ip}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-xs text-gray-500">No IPs assigned</span>
+                    )}
+                  </div>
+                </TableCell>
                 <TableCell>
                   <div className="flex gap-2">
                     <Button
@@ -331,7 +415,7 @@ export default function UserManagement() {
           </TableBody>
         </Table>
 
-        {users.length === 0 && (
+        {usersWithIps.length === 0 && (
           <div className="text-center py-8 text-muted-foreground">
             No users found. Create your first admin user.
           </div>
@@ -362,14 +446,28 @@ export default function UserManagement() {
             </div>
             <div>
               <Label htmlFor="edit-password">New Password (Optional)</Label>
-              <Input
-                id="edit-password"
-                type="password"
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                placeholder="Enter new password (leave empty to keep current)"
-                minLength={6}
-              />
+              <div className="relative">
+                <Input
+                  id="edit-password"
+                  type={showPassword ? "text" : "password"}
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  placeholder="Enter new password (leave empty to keep current)"
+                  minLength={6}
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4 text-gray-400" />
+                  ) : (
+                    <Eye className="h-4 w-4 text-gray-400" />
+                  )}
+                </button>
+              </div>
               <p className="text-xs text-gray-500 mt-1">
                 Leave empty to keep current password
               </p>

@@ -133,6 +133,14 @@ Changelog:
   * Added 10 demo users (user1-user10) with password "pass123"
   * Cleaned up debug code and logging
   * All user accounts now work properly with automatic IP whitelisting
+- July 08, 2025. Enhanced user management and IP editing functionality
+  * Added separate "Add Admin" and "Add User" buttons for different user roles
+  * Implemented full IP editing with date modification capabilities
+  * Fixed IP status display with proper expiry date handling
+  * Added "Associated IPs" column to user management showing user IP assignments
+  * Added password visibility toggle in user edit forms
+  * Enhanced username editing functionality alongside password changes
+  * Improved status badges and table layouts for better user experience
 ```
 
 ## User Preferences
