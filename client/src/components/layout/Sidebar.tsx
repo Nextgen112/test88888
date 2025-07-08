@@ -36,6 +36,13 @@ const NavItem: React.FC<NavItemProps> = ({ href, label, icon, active }) => {
 const Sidebar: React.FC = () => {
   const [location] = useLocation();
   
+  const handleScrollToSection = (sectionId: string) => {
+    const element = document.getElementById(sectionId);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+  
   return (
     <aside className="w-64 bg-white border-r border-gray-200 hidden md:block shrink-0">
       <nav className="p-4 space-y-1">
@@ -45,36 +52,27 @@ const Sidebar: React.FC = () => {
           icon={<LayoutDashboard className="w-5 h-5" />} 
           active={location === "/"} 
         />
-        <NavItem 
-          href="/#files" 
-          label="File Management" 
-          icon={<FileUp className="w-5 h-5" />} 
-          active={location === "/#files"} 
-        />
-        <NavItem 
-          href="/#ip-restrictions" 
-          label="IP Restrictions" 
-          icon={<Network className="w-5 h-5" />} 
-          active={location === "/#ip-restrictions"} 
-        />
-        <NavItem 
-          href="/#access-logs" 
-          label="Access Logs" 
-          icon={<ClipboardList className="w-5 h-5" />} 
-          active={location === "/#access-logs"} 
-        />
-        <NavItem 
-          href="/#users" 
-          label="User Management" 
-          icon={<Users className="w-5 h-5" />} 
-          active={location === "/#users"} 
-        />
-        <NavItem 
-          href="/#settings" 
-          label="Settings" 
-          icon={<Settings className="w-5 h-5" />} 
-          active={location === "/#settings"} 
-        />
+        <button 
+          onClick={() => handleScrollToSection('ip-restrictions')}
+          className="flex items-center space-x-2 px-3 py-2 rounded-md font-medium text-dark hover:bg-gray-100 w-full text-left"
+        >
+          <Network className="w-5 h-5" />
+          <span>IP Restrictions</span>
+        </button>
+        <button 
+          onClick={() => handleScrollToSection('access-logs')}
+          className="flex items-center space-x-2 px-3 py-2 rounded-md font-medium text-dark hover:bg-gray-100 w-full text-left"
+        >
+          <ClipboardList className="w-5 h-5" />
+          <span>Access Logs</span>
+        </button>
+        <button 
+          onClick={() => handleScrollToSection('users')}
+          className="flex items-center space-x-2 px-3 py-2 rounded-md font-medium text-dark hover:bg-gray-100 w-full text-left"
+        >
+          <Users className="w-5 h-5" />
+          <span>User Management</span>
+        </button>
       </nav>
       
       <div className="border-t border-gray-200 p-4">
