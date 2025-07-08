@@ -208,27 +208,35 @@ const IPWhitelist: React.FC = () => {
 
   const getIpStatusBadge = (ip: any) => {
     let status = IpStatus.ACTIVE;
+    let statusText = "Active";
     
     // Check if IP has expiry and if it's expired
     if (ip.expiresAt) {
       const expiryDate = new Date(ip.expiresAt);
-      if (expiryDate < new Date()) {
+      const now = new Date();
+      
+      // Set time to start of day for accurate comparison
+      expiryDate.setHours(23, 59, 59, 999);
+      
+      if (expiryDate < now) {
         status = IpStatus.EXPIRED;
+        statusText = "Expired";
       } else {
         status = IpStatus.TEMPORARY;
+        statusText = "Temporary";
       }
     }
     
     // Generate appropriate badge based on status
     switch (status) {
       case IpStatus.ACTIVE:
-        return <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">Active</span>;
+        return <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">{statusText}</span>;
       case IpStatus.TEMPORARY:
-        return <span className="px-2 py-1 text-xs font-medium bg-amber-100 text-amber-800 rounded-full">Temporary</span>;
+        return <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">{statusText}</span>;
       case IpStatus.EXPIRED:
-        return <span className="px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full">Expired</span>;
+        return <span className="px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full">{statusText}</span>;
       default:
-        return null;
+        return <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-full">Unknown</span>;
     }
   };
 
@@ -259,6 +267,7 @@ const IPWhitelist: React.FC = () => {
                 <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">IP Address</th>
                 <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
                 <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Added</th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Expires</th>
                 <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                 <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
@@ -266,13 +275,13 @@ const IPWhitelist: React.FC = () => {
             <tbody className="bg-white divide-y divide-gray-200">
               {isLoading ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-3 text-sm text-center text-gray-500">
+                  <td colSpan={6} className="px-4 py-3 text-sm text-center text-gray-500">
                     Loading IP whitelist...
                   </td>
                 </tr>
               ) : ipWhitelists.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-3 text-sm text-center text-gray-500">
+                  <td colSpan={6} className="px-4 py-3 text-sm text-center text-gray-500">
                     No IP addresses in whitelist
                   </td>
                 </tr>
@@ -284,6 +293,9 @@ const IPWhitelist: React.FC = () => {
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-500">{ip.description}</td>
                     <td className="px-4 py-3 text-sm text-gray-500">{formatDate(ip.createdAt.toString())}</td>
+                    <td className="px-4 py-3 text-sm text-gray-500">
+                      {ip.expiresAt ? formatDate(ip.expiresAt) : "Never"}
+                    </td>
                     <td className="px-4 py-3">
                       {getIpStatusBadge(ip)}
                     </td>
