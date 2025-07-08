@@ -254,7 +254,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // File upload functionality removed - files are manually added to server
+  // File upload route (admin only)
+  app.post('/api/files/upload', isAuthenticated, fileUploadMiddleware, async (req, res) => {
+    try {
+      // Check if current user is admin
+      const currentUser = await storage.getUser(req.session.userId!);
+      if (!currentUser || currentUser.role !== 'admin') {
+        return res.status(403).json({ error: 'Admin access required' });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ error: 'No file uploaded' });
+      }
+
+      // Create file record in database
+      const newFile = await storage.createFile({
+        filename: req.file.filename,
+        originalFilename: req.file.originalname,
+        size: req.file.size,
+        mimeType: req.file.mimetype,
+        uploadedBy: currentUser.id
+      });
+
+      // Log the upload
+      await storage.createAccessLog({
+        ipAddress: req.clientIp || 'unknown',
+        fileId: newFile.id,
+        eventType: 'file_upload',
+        status: 'upload',
+        details: `File uploaded by admin: ${newFile.originalFilename}`
+      });
+
+      res.status(201).json(newFile);
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      res.status(500).json({ error: 'Failed to upload file' });
+    }
+  });
   
   // Delete a file
   app.delete('/api/files/:id', async (req, res) => {

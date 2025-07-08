@@ -53,6 +53,13 @@ const Sidebar: React.FC = () => {
           active={location === "/"} 
         />
         <button 
+          onClick={() => handleScrollToSection('file-upload')}
+          className="flex items-center space-x-2 px-3 py-2 rounded-md font-medium text-dark hover:bg-gray-100 w-full text-left"
+        >
+          <FileUp className="w-5 h-5" />
+          <span>File Upload</span>
+        </button>
+        <button 
           onClick={() => handleScrollToSection('ip-restrictions')}
           className="flex items-center space-x-2 px-3 py-2 rounded-md font-medium text-dark hover:bg-gray-100 w-full text-left"
         >

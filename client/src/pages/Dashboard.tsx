@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import Header from "@/components/layout/Header";
 import Sidebar from "@/components/layout/Sidebar";
 import DashboardOverview from "@/components/dashboard/DashboardOverview";
-// FileUpload component removed - file upload functionality disabled
+import FileUpload from "@/components/dashboard/FileUpload";
 import IPWhitelist from "@/components/dashboard/IPWhitelist";
 import AccessLogs from "@/components/dashboard/AccessLogs";
 import UserManagement from "@/components/dashboard/UserManagement";
@@ -105,7 +105,10 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
           {/* Dashboard Content */}
           <DashboardOverview />
           
-          {/* File upload functionality disabled - files are manually managed on server */}
+          {/* File Upload Section */}
+          <section id="file-upload">
+            <FileUpload />
+          </section>
           
           {/* IP Whitelist Section */}
           <section id="ip-restrictions">
